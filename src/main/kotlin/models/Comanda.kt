@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Comanda(
     val idComanda: Int,
-    val importe: Float
+    val importe: Float,
+    val pagado: Boolean
 )
-
-val comandaStorage = mutableListOf<Comanda>()

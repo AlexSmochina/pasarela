@@ -2,55 +2,102 @@ package com.example
 
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import models.Comanda
 import java.util.Scanner
 
+val scan = Scanner(System.`in`)
+
 suspend fun main() {
-    val client = HttpClient(CIO)
-    val scan = Scanner(System.`in`)
 
-    // Hacer una solicitud GET al servidor de comandas para obtener todas las comandas
-    var response: HttpResponse = client.get("http://127.0.0.1:8080/comanda") {
-        contentType(ContentType.Application.Json)
+    var continuar = true
+    while (continuar) {
+        println("BIENVENID@ AL PORTAL DE PAGO!")
+        println("1- identificarse \n2- Salir")
+        print("opcion: ")
+        val option = scan.nextInt()
+        scan.nextLine()
+        when(option){
+            1 -> { iniciarSecion() }
+            2 -> { continuar = false }
+        }
     }
-    println("Status después del GET: ${response.status}")
+}
 
-    if (response.status.isSuccess()) {
-        // Obtener todas las comandas del cuerpo de la respuesta
-        val comandas = Json.decodeFromString<List<Comanda>>(response.bodyAsText())
+suspend fun iniciarSecion() {
+    val urlServer = "http://127.0.0.1:8081/comanda"
 
-        // Mostrar todas las comandas al usuario
-        println("Comandas disponibles:")
-        for (c in comandas) {
-            println("ID de Comanda: ${c.idComanda} - Importe: ${c.importe}")
+    println()
+    print("nombre: ")
+    val nom  = scan.nextLine()
+    var continuar = true
+    while (continuar){
+        println("BIENVENID@ AL PORTAL DE PAGO!")
+        println("1- Visualizar Comandas \n2- Pagar Comanda \n3- Salir")
+        print("opcion: ")
+        val option = scan.nextInt()
+
+        when(option){
+            1 -> { visualizarComandas( urlServer, nom ) }
+            2 -> { pagarComandas( urlServer ) }
+            3 -> { continuar = false }
         }
+    }
+}
 
-        // Solicitar al usuario que ingrese el ID del comando que desea pagar
-        println("Ingrese el ID del comando que desea pagar:")
-        val comandaId = scan.nextInt()
+suspend fun pagarComandas(urlServer: String) {
 
-        // Verificar si el ID ingresado es válido
-        if (comandaId != null) {
-            // Hacer una solicitud POST al servidor de comandas para pagar el comando seleccionado
-            response = client.post("http://127.0.0.1:8080/comanda/$comandaId") {
-                contentType(ContentType.Application.Json)
-            }
-            println("Status después del POST: ${response.status}")
+    println("Introduce el id de la comanda que quieras pagar.")
+    print("Id: ")
+    val id = scan.nextInt()
 
-            if (response.status.isSuccess()) {
-                println("El comando con ID $comandaId ha sido pagado exitosamente.")
-            } else {
-                println("No se pudo pagar el comando con ID $comandaId. Código de estado: ${response.status}")
-            }
-        } else {
-            println("ID de comando inválido.")
+    val client = HttpClient(CIO){
+        install(HttpTimeout)
+    }
+    val urlAlta = "/pagar/$id"
+    val urlFinal = urlServer + urlAlta
+
+    val response: HttpResponse = client.get(urlFinal) {
+        timeout {
+            requestTimeoutMillis = 300*1000
         }
+    }
+
+    val texto = response.bodyAsText()
+    println(texto)
+    if ( texto == "Pagado Correctamente!" ){
+        println("¡OPERACION EXITOSA!")
     } else {
-        println("No se pudieron obtener las comandas. Código de estado: ${response.status}")
+        println("¡No ha sido posible!")
+    }
+
+    client.close()
+}
+
+suspend fun visualizarComandas(urlServer: String, nom: String) {
+    val client = HttpClient(CIO){
+        install(HttpTimeout)
+    }
+
+    val urlAlta = "/$nom"
+    val urlFinal = urlServer + urlAlta
+
+    val response: HttpResponse = client.get(urlFinal) {
+        timeout {
+            requestTimeoutMillis = 300*1000
+        }
+    }
+
+    println("\nLista de Comandas:")
+    val cmd = response.bodyAsText()
+    val comandas = Json.decodeFromString< List<Comanda> >( cmd )
+    comandas.forEach{
+        println( "idComanda - ${it.idComanda}, importe - ${it.importe}, pagado - ${it.pagado}  " )
     }
 
     client.close()
